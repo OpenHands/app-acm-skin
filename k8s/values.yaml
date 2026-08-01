@@ -1,0 +1,108 @@
+# acm-skin — Agent Canvas (feature/skins build) running the ACM skin.
+#
+# Deployed with the vendored chart in ../chart (helm/agent-canvas from
+# OpenHands/OpenHands branch feature/skins, PR #16232):
+#
+#   helm upgrade --install acmskin ./chart -n agent-canvas-apps -f k8s/values.yaml
+#
+# The release AND resource names are `acmskin` (NOT acm-skin) on purpose:
+#  * ACM instances enumerate helm releases with the `acm-` prefix, and this
+#    host must not show up as a managed instance.
+#  * A Service named `acm-skin` would make kubelet inject the Docker-link
+#    var ACM_SKIN_PORT=tcp://<clusterIP>:8000 into every pod in the
+#    namespace — which crashes any ACM backend (it reads ACM_SKIN_PORT as
+#    an int for the skin-gateway ingress port), including the existing
+#    `acm` deployment on its next restart. `acmskin` yields the harmless
+#    ACMSKIN_PORT instead.
+# Only the public host stays acm-skin.apps.staging.all-hands.dev.
+fullnameOverride: acmskin
+
+image:
+  # Skins-capable Agent Canvas image built from OpenHands/OpenHands
+  # branch feature/skins (PR #16232).
+  tag: sha-6044f6b
+
+# ACM shells out to helm/kubectl to provision new Canvas instances in this
+# namespace. The chart's SA gets the built-in `admin` ClusterRole there.
+rbac:
+  enabled: true
+  namespaces:
+    - agent-canvas-apps
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: all-hands-system-oauth-errors@kubernetescrd,all-hands-system-oauth-auth@kubernetescrd,all-hands-system-preserve-authorization@kubernetescrd
+  hosts:
+    - host: acm-skin.apps.staging.all-hands.dev
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - acm-skin.apps.staging.all-hands.dev
+      secretName: acmskin-tls
+
+persistence:
+  size: 5Gi
+  # c4 nodes reject pd-balanced; hyperdisk-balanced is what every other
+  # PVC in this namespace uses.
+  storageClassName: hyperdisk-balanced
+
+secrets:
+  sessionApiKey:
+    existingSecret: acm-skin-session
+    key: sessionApiKey
+
+config:
+  skin:
+    # ACM in skin format (skin.yaml + package.json `start`).
+    repo: "https://github.com/OpenHands/app-acm"
+    ref: "feature/skin-format"
+  extraEnv:
+    # app-acm is PRIVATE: the skin-service clones OPENHANDS_SKIN_REPO with
+    # this token. The ACM backend also uses it for the marketplace list,
+    # private skin repos, and the version dropdown.
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: acm-skin-github
+          key: token
+    # skins/marketplace.json is not on `main` yet (OpenHands/extensions
+    # PR #433); read it from the branch until that merges.
+    - name: ACM_MARKETPLACE_URL
+      value: "https://raw.githubusercontent.com/OpenHands/extensions/feature/skins-marketplace/skins/marketplace.json"
+    # Session key of the global-store Canvas at
+    # agent.apps.staging.all-hands.dev (same secret the acm app uses).
+    - name: ACM_STORE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: acm-store
+          key: session-key
+          optional: true
+    # Image tag ACM pins new instances to whenever a marketplace skin is
+    # selected (default already sha-6044f6b; pinned here for clarity).
+    - name: ACM_SKINS_IMAGE_TAG
+      value: "sha-6044f6b"
+    # Belt-and-suspenders: a Service upcasing to ACM_SKIN (e.g. `acm-skin`)
+    # makes kubelet inject ACM_SKIN_PORT=tcp://<ip>:8000 into every pod in
+    # the namespace, which crashes the ACM backend (int(ACM_SKIN_PORT)).
+    # Resources are named `acmskin` to avoid that; pin the value anyway so
+    # a future rename can't break this pod.
+    - name: ACM_SKIN_PORT
+      value: "8081"
+    # The skins image ships no kubectl/helm. deploy.sh installs them onto
+    # the persistent workspace volume at ~/workspace/bin after first boot;
+    # this puts that directory on PATH for the ACM backend's subprocesses.
+    - name: PATH
+      value: "/home/openhands/workspace/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 2Gi
