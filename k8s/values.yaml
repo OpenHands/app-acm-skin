@@ -20,7 +20,7 @@ fullnameOverride: acmskin
 image:
   # Skins-capable Agent Canvas image built from OpenHands/OpenHands
   # branch feature/skins (PR #16232).
-  tag: sha-27566fd
+  tag: sha-59161be
 
 # ACM shells out to helm/kubectl to provision new Canvas instances in this
 # namespace. The chart's SA gets the built-in `admin` ClusterRole there.
@@ -83,9 +83,9 @@ config:
           key: session-key
           optional: true
     # Image tag ACM pins new instances to whenever a marketplace skin is
-    # selected (default already sha-27566fd; pinned here for clarity).
+    # selected (default already sha-59161be; pinned here for clarity).
     - name: ACM_SKINS_IMAGE_TAG
-      value: "sha-27566fd"
+      value: "sha-59161be"
     # Belt-and-suspenders: a Service upcasing to ACM_SKIN (e.g. `acm-skin`)
     # makes kubelet inject ACM_SKIN_PORT=tcp://<ip>:8000 into every pod in
     # the namespace, which crashes the ACM backend (int(ACM_SKIN_PORT)).
