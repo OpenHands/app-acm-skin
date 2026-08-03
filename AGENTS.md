@@ -37,3 +37,19 @@ Repo-specific notes:
   `native_skins` in app-acm `backend/server.py::helm_deploy` (commit
   `b1a310c`); a wrong `/ → 8081` route makes an installed skin look like
   it "didn't take hold" (the gateway 302s to /canvas).
+- Since feature/skins commit `e4e89e1` (image `sha-e4e89e1`), the skin is
+  **nested inside the Canvas UI**: `/` no longer rewrites to `/skin/` —
+  it 308s to `/canvas/`, whose index route redirects into the `/skin`
+  iframe tab when a skin is installed. The skin app is still proxied
+  verbatim at `/skin/` (backend at `/skin/api/*`). The earlier bullet
+  about "serve the skin natively at /" is superseded; ingress routing
+  (single `/ → 8000`) is unchanged.
+- Datadog skin auth: `ddpat_…` personal access tokens need
+  `Authorization: Bearer`, NOT the `DD-API-KEY`/`DD-APPLICATION-KEY`
+  pair, and the org may live on a non-default site (ours:
+  `us5.datadoghq.com`, stored as the `DATADOG_SITE` secret on the
+  instance). A 401 from `api.datadoghq.com` with a ddpat token usually
+  means wrong site and/or wrong header style.
+- Skin secrets live on the instance's agent-server:
+  `PUT /api/settings/secrets` with JSON `{name, value, description}`
+  (there is no per-name POST/PUT; `POST …/secrets/<name>` returns 405).
