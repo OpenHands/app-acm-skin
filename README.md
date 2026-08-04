@@ -1,7 +1,7 @@
 # acm-skin — branch ACM running as an Agent Canvas skin
 
 An Agent Canvas instance built from the **skins-capable image**
-(`ghcr.io/openhands/agent-canvas:sha-e4e89e1`, from OpenHands/OpenHands
+(`ghcr.io/openhands/agent-canvas:sha-cb8e5be`, from OpenHands/OpenHands
 branch `feature/skins`, PR #16232) with the **Agent Canvas Manager (ACM)
 installed as its skin** (OpenHands/app-acm branch `feature/skin-format`,
 app-acm PR #1). ACM appears as the default "Agent Canvas Manager" tab of
@@ -36,7 +36,7 @@ chat with it, and it manages the fleet through the embedded ACM.
 - `chart/` — vendored `helm/agent-canvas` chart from OpenHands/OpenHands
   branch `feature/skins` (defaults `config.skin.repo` to app-acm).
 - `k8s/values.yaml` — the values for this instance: image tag pinned to
-  `sha-e4e89e1`, skin ref `feature/skin-format`, RBAC in
+  `sha-cb8e5be`, skin ref `feature/skin-format`, RBAC in
   `agent-canvas-apps`, OAuth-guarded ingress, secrets wiring.
 - `deploy.sh` — `helm upgrade --install` + post-boot kubectl/helm
   bootstrap onto the persistent workspace volume.
@@ -78,7 +78,7 @@ kubectl get certificate acmskin-tls -n agent-canvas-apps   # READY=True
 Open <https://acm-skin.apps.staging.all-hands.dev> — the default tab is
 "Agent Canvas Manager". In ACM, click **New backend**, pick a skin (e.g.
 Datadog Monitor) from the marketplace grid, create — the new instance
-boots on `sha-e4e89e1` with `config.skin.repo` set and comes up with that
+boots on `sha-cb8e5be` with `config.skin.repo` set and comes up with that
 skin as its default tab.
 
 ## Sharp edges (learned the hard way)
