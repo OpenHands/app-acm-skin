@@ -53,3 +53,18 @@ Repo-specific notes:
 - Skin secrets live on the instance's agent-server:
   `PUT /api/settings/secrets` with JSON `{name, value, description}`
   (there is no per-name POST/PUT; `POST …/secrets/<name>` returns 405).
+- Since feature/skins commit `cb8e5be` (image `sha-cb8e5be`), the skin
+  checkout lives **in the agent workspace at `~/workspace/skin`** (was
+  `~/.openhands/agent-canvas/skin/repo`; migrated automatically on boot).
+  The Canvas static-server supervises it (own process group, SIGKILL
+  backstop — no more orphaned `node server.js` holding the port) and
+  `POST /skin-api/restart` (session key) applies agent edits. Service
+  state + `skin.log` stay in `~/.openhands/agent-canvas/skin/`.
+  `/skin-api/status` now reports the checkout `path`.
+- The `skin` skill ACM injects (app-acm `skin/SKILL.md`, installed to
+  `~/.openhands/skills/installed/skin/SKILL.md`) was rewritten for this
+  architecture (edit → restart → verify loop; screenshot must include the
+  Canvas chrome and be embedded in the repo README; the old top-left
+  "← Agent Canvas" link requirement is gone). ACM only installs it at
+  provision time — after changing it, re-push it onto live instances
+  (kubectl exec + cat, per pod).
