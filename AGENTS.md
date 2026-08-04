@@ -61,6 +61,11 @@ Repo-specific notes:
   `POST /skin-api/restart` (session key) applies agent edits. Service
   state + `skin.log` stay in `~/.openhands/agent-canvas/skin/`.
   `/skin-api/status` now reports the checkout `path`.
+- skin.yaml supports `icon: <lucide-name>` (kebab-case, placed under
+  `name:`), rendered on the skin's left-nav entry via
+  `lucide-react/dynamic` (falls back to the Palette icon when absent or
+  invalid; validated server-side by `sanitizeIconName`). Since image
+  `sha-8a5a2c0`.
 - The `skin` skill ACM injects (app-acm `skin/SKILL.md`, installed to
   `~/.openhands/skills/installed/skin/SKILL.md`) was rewritten for this
   architecture (edit → restart → verify loop; screenshot must include the
