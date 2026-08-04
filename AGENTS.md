@@ -66,6 +66,17 @@ Repo-specific notes:
   `lucide-react/dynamic` (falls back to the Palette icon when absent or
   invalid; validated server-side by `sanitizeIconName`). Since image
   `sha-8a5a2c0`.
+- Every skin repo must ship a root `SKILL.md` describing what the skin
+  does. On every skin start/restart/pull the skin service renders it
+  (frontmatter replaced, `description:` kept, no `triggers:`) to
+  `~/.openhands/skills/skin-app.md` — a legacy always-active skill whose
+  full content lands in the agent's system prompt at the start of every
+  conversation. Removed on uninstall; new installs without SKILL.md are
+  rejected. Since image `sha-05cfc33`.
+- Docker builds on OpenHands `feature/skins` do NOT auto-trigger on push
+  (docker.yml only fires on main/tags/PRs-to-main). Dispatch manually:
+  `POST /repos/OpenHands/OpenHands/actions/workflows/docker.yml/dispatches`
+  with `{"ref":"feature/skins"}`.
 - The `skin` skill ACM injects (app-acm `skin/SKILL.md`, installed to
   `~/.openhands/skills/installed/skin/SKILL.md`) was rewritten for this
   architecture (edit → restart → verify loop; screenshot must include the
