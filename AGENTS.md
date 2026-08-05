@@ -13,16 +13,25 @@ staging cluster (`agent-canvas-apps` namespace).
 Repo-specific notes:
 
 - This app is a **helm release named `acmskin`** (not a Deployment/ConfigMap
-  app). The chart in `chart/` is vendored from OpenHands/OpenHands branch
-  `feature/skins` — refresh it from that branch, not main.
+  app). There is **no vendored chart**: `deploy.sh` clones
+  OpenHands/OpenHands branch `feature/skins` and installs its live
+  `helm/agent-canvas` chart (override the branch with `CHART_REF`).
 - Read the "Sharp edges" section of README.md before renaming anything:
   the `acmskin` (no hyphen) resource naming avoids the kubelet
   `ACM_SKIN_PORT` service-link env collision, and the release name must
   not start with `acm-` or ACM fleet listings pick it up.
-- The ACM skin source lives in OpenHands/app-acm branch
-  `feature/skin-format`, not in this repo. To pick up skin changes on the
-  live instance: `POST /skin-api/pull` (with the session key) on
-  acmskin-0, or uninstall/reinstall via `/skin-api`.
+- The ACM skin source lives in **OpenHands/skin-acm** (main branch) — its
+  own skin repo like skin-datadog-monitor / skin-linear-admin — not in
+  this repo (and no longer in app-acm; the old `feature/skin-format`
+  branch there is superseded). To pick up skin changes on the live
+  instance: `POST /skin-api/pull` (with the session key) on acmskin-0, or
+  uninstall/reinstall via `/skin-api`.
+- The skin-acm backend fetches the agent-canvas helm chart **live from
+  GitHub** at deploy time (`ACM_CHART_REPO`/`ACM_CHART_REF`/
+  `ACM_CHART_PATH`, default OpenHands/OpenHands@feature/skins
+  helm/agent-canvas, cached 10 min). Because that chart defaults
+  `config.skin.repo` to the ACM skin, `helm_deploy` always sets
+  `config.skin.repo` explicitly (selected skin or `""`).
 - **After `/skin-api/pull`, verify the skin backend actually restarted**
   (`ps` for `start-skin.py` inside acmskin-0 and check
   `/skin-api/status` shows `running:true` with no port-bind error in
@@ -30,13 +39,10 @@ Repo-specific notes:
   keep port 18002 bound so the restarted backend crash-loops with
   `Errno 98` and the live ACM keeps serving the *old* code; kill the
   stale pid and the supervisor respawns the new one.
-- Instances ACM provisions on skins-capable (non-semver) image tags serve
-  the skin natively at `/` on port 8000 — their ingress must be a single
-  `/ → 8000` path and **no** `skinGateway` sidecar. Tagged releases
-  (vX.Y.Z) still use the legacy gateway (`/ → 8081`). This is handled by
-  `native_skins` in app-acm `backend/server.py::helm_deploy` (commit
-  `b1a310c`); a wrong `/ → 8081` route makes an installed skin look like
-  it "didn't take hold" (the gateway 302s to /canvas).
+- Instances ACM provisions serve the skin natively at `/` on port 8000 —
+  their ingress is a single `/ → 8000` path (the live chart has no
+  skinGateway sidecar; the legacy vX.Y.Z gateway path was dropped along
+  with the vendored chart, so provisioning is skins-image only).
 - Since feature/skins commit `e4e89e1` (image `sha-e4e89e1`), the skin is
   **nested inside the Canvas UI**: `/` no longer rewrites to `/skin/` —
   it 308s to `/canvas/`, whose index route redirects into the `/skin`
@@ -77,10 +83,11 @@ Repo-specific notes:
   (docker.yml only fires on main/tags/PRs-to-main). Dispatch manually:
   `POST /repos/OpenHands/OpenHands/actions/workflows/docker.yml/dispatches`
   with `{"ref":"feature/skins"}`.
-- The `skin` skill ACM injects (app-acm `skin/SKILL.md`, installed to
+- The `skin` skill ACM injects (skin-acm `skin/SKILL.md`, installed to
   `~/.openhands/skills/installed/skin/SKILL.md`) was rewritten for this
   architecture (edit → restart → verify loop; screenshot must include the
   Canvas chrome and be embedded in the repo README; the old top-left
-  "← Agent Canvas" link requirement is gone). ACM only installs it at
-  provision time — after changing it, re-push it onto live instances
+  "← Agent Canvas" link requirement is gone; skins should use top-level
+  horizontal navigation, never a left-hand sidebar). ACM only installs it
+  at provision time — after changing it, re-push it onto live instances
   (kubectl exec + cat, per pod).

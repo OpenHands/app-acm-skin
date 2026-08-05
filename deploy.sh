@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy acm-skin: an Agent Canvas instance (feature/skins build) running
-# the ACM skin from OpenHands/app-acm@feature/skin-format.
+# the ACM skin from OpenHands/skin-acm@main.
 #
 # One-off secrets (NOT part of this script's manifests; values come from
 # the environment, never from the repo):
@@ -9,7 +9,7 @@
 #   kubectl create secret generic acm-skin-session -n agent-canvas-apps \
 #     --from-literal=sessionApiKey="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"
 #
-#   # GitHub token — required: app-acm is private (skin clone) and the
+#   # GitHub token — required: skin-acm is private (skin clone) and the
 #   # marketplace/skin repos are private too:
 #   kubectl create secret generic acm-skin-github -n agent-canvas-apps \
 #     --from-literal=token="$GITHUB_PERSONAL_ACCESS_TOKEN"
@@ -21,11 +21,19 @@ set -euo pipefail
 NS=agent-canvas-apps
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# No vendored chart: install from the LIVE helm/agent-canvas chart on
+# OpenHands/OpenHands branch feature/skins.
+CHART_REF="${CHART_REF:-feature/skins}"
+CHART_CHECKOUT="$(mktemp -d)"
+trap 'rm -rf "$CHART_CHECKOUT"' EXIT
+git clone -q --depth 1 -b "$CHART_REF" \
+  https://github.com/OpenHands/OpenHands.git "$CHART_CHECKOUT"
+
 # Release AND resources are `acmskin` (no hyphen): ACM fleet listings
 # (helm releases prefixed `acm-`) must not pick this host up, and a
 # Service named acm-skin would inject ACM_SKIN_PORT=tcp://... into every
 # pod in the namespace, crashing ACM backends (see README "Sharp edges").
-helm upgrade --install acmskin "$DIR/chart" -n "$NS" \
+helm upgrade --install acmskin "$CHART_CHECKOUT/helm/agent-canvas" -n "$NS" \
   -f "$DIR/k8s/values.yaml" --wait --timeout 8m
 
 kubectl -n "$NS" rollout status statefulset/acmskin

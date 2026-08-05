@@ -1,12 +1,15 @@
-# acm-skin — branch ACM running as an Agent Canvas skin
+# acm-skin — deployment of the ACM skin's host instance
 
-An Agent Canvas instance built from the **skins-capable image**
-(`ghcr.io/openhands/agent-canvas:sha-05cfc33`, from OpenHands/OpenHands
-branch `feature/skins`, PR #16232) with the **Agent Canvas Manager (ACM)
-installed as its skin** (OpenHands/app-acm branch `feature/skin-format`,
-app-acm PR #1). ACM appears as the default "Agent Canvas Manager" tab of
-the Canvas UI and can itself provision new Canvas instances with skins
-picked from the marketplace.
+**This repo is deployment-only.** It holds the helm values + deploy script
+for one Agent Canvas instance (release `acmskin`) built from the
+**skins-capable image** (`ghcr.io/openhands/agent-canvas:sha-05cfc33`,
+from OpenHands/OpenHands branch `feature/skins`, PR #16232) with the
+**Agent Canvas Manager (ACM) installed as its skin**. The skin itself —
+backend, SPA, `skin.yaml` — lives in its own repo like every other skin:
+**[OpenHands/skin-acm](https://github.com/OpenHands/skin-acm)**. ACM
+appears as the default "Agent Canvas Manager" tab of the Canvas UI and can
+itself provision new Canvas instances with skins picked from the
+marketplace.
 
 - **Live URL:** <https://acm-skin.apps.staging.all-hands.dev>
 - Skin status: `https://acm-skin.apps.staging.all-hands.dev/skin-api/status`
@@ -16,13 +19,11 @@ picked from the marketplace.
   (same fleet as the standalone [acm](https://github.com/OpenHands/app-acm)
   app — both list `acm-*` helm releases).
 
-## How it differs from the `acm` app
+## How it works
 
-The standalone `acm` app is a Deployment of a stdlib-Python backend +
-static SPA with vendored chart ConfigMaps. **This** app is a full Agent
-Canvas (StatefulSet from the `feature/skins` helm chart) whose skin
-service clones app-acm@feature/skin-format on first boot, runs its
-`npm run start` (→ `start-skin.py` → `backend/server.py`) on
+This app is a full Agent Canvas (StatefulSet from the `feature/skins`
+helm chart) whose skin service clones skin-acm@main on first boot, runs
+its `npm run start` (→ `start-skin.py` → `backend/server.py`) on
 `OPENHANDS_SKIN_PORT` (18002), reverse-proxies it verbatim under `/skin`
 (and serves it at `/` as the instance's front page), and
 adds it as the top sidebar item / default tab. Skin management lives at
@@ -33,13 +34,13 @@ chat with it, and it manages the fleet through the embedded ACM.
 
 ## Layout
 
-- `chart/` — vendored `helm/agent-canvas` chart from OpenHands/OpenHands
-  branch `feature/skins` (defaults `config.skin.repo` to app-acm).
 - `k8s/values.yaml` — the values for this instance: image tag pinned to
-  `sha-05cfc33`, skin ref `feature/skin-format`, RBAC in
+  `sha-05cfc33`, skin `OpenHands/skin-acm@main`, RBAC in
   `agent-canvas-apps`, OAuth-guarded ingress, secrets wiring.
-- `deploy.sh` — `helm upgrade --install` + post-boot kubectl/helm
-  bootstrap onto the persistent workspace volume.
+- `deploy.sh` — clones OpenHands/OpenHands@`feature/skins` and installs
+  its `helm/agent-canvas` chart (**no vendored chart** — the live chart is
+  always used), then bootstraps kubectl/helm onto the persistent
+  workspace volume.
 
 ## Deploy
 
@@ -50,7 +51,7 @@ One-off secrets (values from the environment; never in the repo):
 kubectl create secret generic acm-skin-session -n agent-canvas-apps \
   --from-literal=sessionApiKey="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"
 
-# GitHub token — REQUIRED: app-acm is private (the skin clone needs it) and
+# GitHub token — REQUIRED: skin-acm is private (the skin clone needs it) and
 # the marketplace + skin repos (skin-datadog-monitor, skin-linear-admin)
 # are private too:
 kubectl create secret generic acm-skin-github -n agent-canvas-apps \
@@ -86,19 +87,18 @@ skin as its default tab.
 1. **Never name a Service `acm-skin` (or `acm-anything_underscore-free`)
    that upcases to `ACM_SKIN`.** Kubelet injects Docker-link envs
    (`ACM_SKIN_PORT=tcp://<clusterIP>:8000`) into every pod in the
-   namespace, which crashes the ACM backend (`int(ACM_SKIN_PORT)`) on its
-   next restart — including the standalone `acm` app. That's why the helm
-   release and `fullnameOverride` are **`acmskin`** and the values file
-   additionally pins `ACM_SKIN_PORT=8081` in `extraEnv` for this pod.
+   namespace, which crashed older ACM backends that read `ACM_SKIN_PORT`
+   as an int (the current skin-acm backend no longer reads it, but other
+   pods may still run old code). That's why the helm release and
+   `fullnameOverride` are **`acmskin`**.
 2. **The skins image ships no kubectl/helm.** The ACM backend shells out
    to both; `deploy.sh` installs them to `~/workspace/bin` (persistent
    volume) and `values.yaml` puts that on `PATH`.
 3. **Private skin repos need `GITHUB_TOKEN` on the *child* instance.**
    The skin-service clones `OPENHANDS_SKIN_REPO` with `GITHUB_TOKEN`.
-   app-acm@feature/skin-format (commit `cacd1e0`) makes ACM pass a
-   `secretKeyRef` to the `acm-github` Secret into every instance it
-   creates with a marketplace skin. This host's own clone of app-acm uses
-   the `acm-skin-github` Secret the same way.
+   ACM passes a `secretKeyRef` to the `acm-github` Secret into every
+   instance it creates with a marketplace skin. This host's own clone of
+   skin-acm uses the `acm-skin-github` Secret the same way.
 4. **The marketplace list is on a branch.** `skins/marketplace.json`
    lives on OpenHands/extensions branch `feature/skins-marketplace`
    (until PR #433 merges); `ACM_MARKETPLACE_URL` points there.
